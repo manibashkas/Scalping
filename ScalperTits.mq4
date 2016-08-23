@@ -8,6 +8,7 @@
 #property version   "1.00"
 #property strict
 #include  <C_MT\custom_functions_kit.mqh>
+#include  <C_MT\C_TrailingStop.mqh>
 //+------------------------------------------------------------------+
 //| Expert initialization function                                   |
 //+------------------------------------------------------------------+
@@ -15,7 +16,15 @@ extern int pointTo = 30; // points to pending order
 extern int stoploss_point = 21; // stoploss point exhibition
 extern int takeprofit_point = 10;  // takeprofit point exhibition
 extern double volume_L = 1.0; // initial lot
-extern int max_risk = 5; // what amoun of funds used to 1 order in %
+extern int max_risk = 5; // what amount of funds used to 1 order in %
+extern bool Trailing_Stop = true;
+extern int int_Trailing_Profit = 80; // Trailing Starts at profit *points
+extern int int_Trailing_Stop_Level = 25; // Trailing distance *points
+extern int int_trailing_Step = 5;      //  Trailing Step *points
+
+double trailing_profit;
+double trailing_stoplevel;
+double trailing_step;
 
 double stop_loss;
 double take_profit;
@@ -28,6 +37,8 @@ double min_stoplevel;
 int slippage = 3;
 int factor; // price factor
 int magic = 111; // magic number
+
+C_TrailingStop trailing_listener(magic);
 
 double Optimal_Lot()
    {
@@ -135,6 +146,25 @@ int OnInit()
   
    factor = (Digits%2 == 0)?100:1000;
    point = (Digits%2 == 0)?Point:Point*10;
+   
+   if(!Trailing_Stop)
+         trailing_listener.TurnOff();
+      
+      if(Trailing_Stop)
+         {
+           // check Trailing Stop parameters 
+         trailing_profit = Pips_to_Points(int_Trailing_Profit);
+         trailing_stoplevel = Pips_to_Points(int_Trailing_Stop_Level);
+         trailing_step = Pips_to_Points(int_trailing_Step);
+         
+         CheckMinStopLevel(trailing_profit,min_stoplevel, "Trailing Profit");
+         CheckMinStopLevel(trailing_stoplevel,min_stoplevel, "Trailing Stop Level");
+         
+         trailing_listener.SetProfit(trailing_profit);
+         trailing_listener.SetTrailingStopLevel(trailing_stoplevel);
+         trailing_listener.SetTrailingStep(trailing_step);
+         }
+ 
 //---
    
 //---
@@ -156,6 +186,7 @@ void OnTick()
    CustomOrderSend(CheckCross(), correct_volume_L);
    
    GetLevels();
+   trailing_listener.Monitor();
 //---
    
   }
